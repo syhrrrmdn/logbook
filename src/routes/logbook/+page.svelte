@@ -19,8 +19,16 @@
 	} from 'lucide-svelte';
 	import type { ApiResponse } from '$lib/types';
 
+	// Fungsi untuk mendapatkan tanggal hari ini dalam format DD-MM-YYYY waktu lokal
+	const getLocalDateString = () => {
+		const d = new Date();
+		const day = String(d.getDate()).padStart(2, '0');
+		const month = String(d.getMonth() + 1).padStart(2, '0');
+		return `${day}-${month}-${d.getFullYear()}`;
+	};
+
 	// State menggunakan Svelte 5 Runes ($state)
-	let tanggal = $state(new Date().toISOString().split('T')[0]);
+	let tanggal = $state(getLocalDateString());
 	let deskripsi = $state('');
 	let luaran = $state('');
 	
@@ -88,8 +96,8 @@
 	function validateForm(): boolean {
 		const errors: Record<string, string> = {};
 
-		if (!tanggal) {
-			errors.tanggal = 'Tanggal logbook wajib dipilih.';
+		if (!tanggal.trim()) {
+			errors.tanggal = 'Tanggal/Rentang logbook wajib diisi.';
 		}
 
 		if (!deskripsi.trim()) {
@@ -210,11 +218,12 @@
 			<div class="space-y-2">
 				<label for="tanggal" class="flex items-center gap-2 text-sm font-semibold text-slate-200">
 					<Calendar class="w-4 h-4 text-indigo-400" />
-					<span>Tanggal <span class="text-rose-400">*</span></span>
+					<span>Tanggal / Rentang Tanggal <span class="text-rose-400">*</span></span>
 				</label>
 				<input
-					type="date"
+					type="text"
 					id="tanggal"
+					placeholder="Contoh: 30-07-2026 atau 01-01-2026 - 05-01-2026"
 					bind:value={tanggal}
 					disabled={isSubmitting}
 					class="w-full px-4 py-3 rounded-xl bg-slate-950/80 border border-slate-800 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all disabled:opacity-50"
