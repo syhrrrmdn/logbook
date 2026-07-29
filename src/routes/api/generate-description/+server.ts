@@ -2,6 +2,27 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { env } from '$env/dynamic/private';
 
+// Daftar model yang akan dicoba secara berurutan (dari terbaru ke cadangan)
+const MODELS = [
+	'gemini-3.6-flash',
+	'gemini-3.5-flash-lite',
+	'gemini-3.5-flash',
+	'gemini-2.0-flash-lite'
+];
+
+async function callGemini(apiKey: string, model: string, prompt: string): Promise<Response> {
+	return fetch(
+		`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+		{
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				contents: [{ parts: [{ text: prompt }] }]
+			})
+		}
+	);
+}
+
 export const POST: RequestHandler = async ({ request }) => {
 	try {
 		const { description } = await request.json();
@@ -13,10 +34,10 @@ export const POST: RequestHandler = async ({ request }) => {
 		const apiKey = env.GEMINI_API_KEY || process.env.GEMINI_API_KEY || '';
 		if (!apiKey) {
 			return json(
-				{ 
-					success: false, 
-					message: 'Gemini API Key tidak ditemukan. Silakan tambahkan GEMINI_API_KEY="..." di file .env Anda.' 
-				}, 
+				{
+					success: false,
+					message: 'Gemini API Key tidak ditemukan. Silakan tambahkan GEMINI_API_KEY="..." di file .env Anda.'
+				},
 				{ status: 500 }
 			);
 		}
@@ -27,42 +48,50 @@ export const POST: RequestHandler = async ({ request }) => {
 Input Kegiatan Pendek: "${description.trim()}"
 Output AI:`;
 
-		// Panggil Gemini API v1beta via fetch
-		const response = await fetch(
-			`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${apiKey}`,
-			{
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json'
-				},
-				body: JSON.stringify({
-					contents: [
-						{
-							parts: [
-								{
-									text: prompt
-								}
-							]
-						}
-					]
-				})
+		// Coba setiap model secara berurutan hingga ada yang berhasil
+		let lastErrorMsg = '';
+		for (const model of MODELS) {
+			try {
+				const response = await callGemini(apiKey, model, prompt);
+
+				// Jika server sibuk (503) atau model tidak ditemukan (404), coba model berikutnya
+				if (response.status === 503 || response.status === 404) {
+					const errorData = await response.json().catch(() => ({}));
+					lastErrorMsg = errorData?.error?.message || `Model ${model} tidak tersedia (${response.status}).`;
+					continue; // Lanjut ke model berikutnya
+				}
+
+				// Jika error lain (misalnya 429 quota), tetap coba model berikutnya
+				if (!response.ok) {
+					const errorData = await response.json().catch(() => ({}));
+					lastErrorMsg = errorData?.error?.message || `Gagal memanggil model ${model}.`;
+					continue;
+				}
+
+				// Berhasil! Parse respons
+				const data = await response.json();
+				const generatedText = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
+
+				if (!generatedText) {
+					lastErrorMsg = `Model ${model} tidak menghasilkan teks.`;
+					continue;
+				}
+
+				return json({ success: true, text: generatedText });
+			} catch {
+				lastErrorMsg = `Gagal menghubungi model ${model}.`;
+				continue;
 			}
+		}
+
+		// Semua model gagal
+		return json(
+			{
+				success: false,
+				message: `Semua model AI sedang tidak tersedia. Error terakhir: ${lastErrorMsg}`
+			},
+			{ status: 503 }
 		);
-
-		if (!response.ok) {
-			const errorData = await response.json().catch(() => ({}));
-			const errorMsg = errorData?.error?.message || 'Gagal menghubungi API Gemini.';
-			return json({ success: false, message: `Error Gemini API: ${errorMsg}` }, { status: response.status });
-		}
-
-		const data = await response.json();
-		const generatedText = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
-
-		if (!generatedText) {
-			return json({ success: false, message: 'AI tidak menghasilkan teks.' }, { status: 500 });
-		}
-
-		return json({ success: true, text: generatedText });
 	} catch (err: unknown) {
 		const errorMsg = err instanceof Error ? err.message : String(err);
 		return json({ success: false, message: `Terjadi kesalahan: ${errorMsg}` }, { status: 500 });
