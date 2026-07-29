@@ -56,13 +56,16 @@
 				headers: {
 					'Content-Type': 'application/json'
 				},
-				body: JSON.stringify({ description: deskripsi })
+				body: JSON.stringify({ description: deskripsi, luaran: luaran })
 			});
 
 			const data = await res.json();
 			if (data.success && data.text) {
 				deskripsi = data.text;
-				toast.success('Penyempurnaan AI Berhasil', 'Deskripsi disempurnakan. Anda masih bisa mengeditnya sebelum dikirim.');
+				if (data.luaran) {
+					luaran = data.luaran;
+				}
+				toast.success('Penyempurnaan AI Berhasil', 'Deskripsi & Luaran disempurnakan. Anda masih bisa mengeditnya sebelum dikirim.');
 			} else {
 				toast.error('AI Gagal Merapikan', data.message || 'Terjadi kesalahan.');
 			}
@@ -270,33 +273,17 @@
 
 			<!-- 2. Deskripsi Kegiatan -->
 			<div class="space-y-2">
-				<div class="flex items-center justify-between">
-					<label for="deskripsi" class="flex items-center gap-2 text-sm font-semibold text-slate-200">
+				<label for="deskripsi" class="flex items-center justify-between text-sm font-semibold text-slate-200">
+					<span class="flex items-center gap-2">
 						<AlignLeft class="w-4 h-4 text-indigo-400" />
 						<span>Deskripsi Kegiatan <span class="text-rose-400">*</span></span>
-					</label>
-					<div class="flex items-center gap-3">
-						<button
-							type="button"
-							onclick={generateDescriptionWithAI}
-							disabled={isSubmitting || isGeneratingDescription || !deskripsi.trim()}
-							class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-						>
-							{#if isGeneratingDescription}
-								<Loader2 class="w-3.5 h-3.5 animate-spin" />
-								<span>Merapikan...</span>
-							{:else}
-								<Sparkles class="w-3.5 h-3.5 text-indigo-400" />
-								<span>Sempurnakan dengan AI ✨</span>
-							{/if}
-						</button>
-						<span class="text-[11px] font-normal text-slate-400">{deskripsi.length} karakter</span>
-					</div>
-				</div>
+					</span>
+					<span class="text-[11px] font-normal text-slate-400">{deskripsi.length} karakter</span>
+				</label>
 				<textarea
 					id="deskripsi"
 					rows="4"
-					placeholder="Jelaskan secara rinci kegiatan magang yang Anda lakukan hari ini..."
+					placeholder="Cukup ketik kata kunci singkat, misal: bikin login supabase"
 					bind:value={deskripsi}
 					disabled={isSubmitting || isGeneratingDescription}
 					class="w-full px-4 py-3 rounded-xl bg-slate-950/80 border border-slate-800 text-slate-100 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all disabled:opacity-50 resize-y"
@@ -321,12 +308,28 @@
 				<input
 					type="text"
 					id="luaran"
-					placeholder="Contoh: Laporan Mingguan, Dokumen Spesifikasi, Source Code Repository"
+					placeholder="Cukup ketik kata kunci singkat, misal: halaman login"
 					bind:value={luaran}
-					disabled={isSubmitting}
+					disabled={isSubmitting || isGeneratingDescription}
 					class="w-full px-4 py-3 rounded-xl bg-slate-950/80 border border-slate-800 text-slate-100 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all disabled:opacity-50"
 				/>
 			</div>
+
+			<!-- Tombol Sempurnakan dengan AI -->
+			<button
+				type="button"
+				onclick={generateDescriptionWithAI}
+				disabled={isSubmitting || isGeneratingDescription || !deskripsi.trim()}
+				class="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500/15 to-violet-500/15 hover:from-indigo-500/25 hover:to-violet-500/25 border border-indigo-500/30 text-indigo-300 text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+			>
+				{#if isGeneratingDescription}
+					<Loader2 class="w-4 h-4 animate-spin" />
+					<span>Menyempurnakan Deskripsi & Luaran...</span>
+				{:else}
+					<Sparkles class="w-4 h-4 text-indigo-400" />
+					<span>Sempurnakan Deskripsi & Luaran dengan AI ✨</span>
+				{/if}
+			</button>
 
 			<!-- 4. Bukti Kegiatan (Dokumentasi Foto) -->
 			<div class="space-y-2">
