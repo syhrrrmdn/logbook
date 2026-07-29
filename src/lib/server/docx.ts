@@ -179,6 +179,7 @@ function getCellText(cellXml: string): string {
 
 /**
  * Memasukkan teks baru ke dalam sel XML <w:tc> dengan mempertahankan properti paragraf dan run asli
+ * serta secara otomatis menghapus formatting bold agar teks hasil input berukuran normal.
  */
 function fillCellText(cellXml: string, text: string): string {
 	const pMatch = cellXml.match(/<w:p[\s>][\s\S]*?<\/w:p>/);
@@ -190,7 +191,10 @@ function fillCellText(cellXml: string, text: string): string {
 
 	// Dapatkan run properties asli (rPr) untuk mempertahankan warna, ukuran, dan font asli template
 	const rPrMatch = pXml.match(/<w:rPr[\s>][\s\S]*?<\/w:rPr>/);
-	const rPr = rPrMatch ? rPrMatch[0] : '<w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri"/><w:sz w:val="22"/></w:rPr>';
+	let rPr = rPrMatch ? rPrMatch[0] : '<w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri"/><w:sz w:val="22"/></w:rPr>';
+
+	// Hapus tag bold (<w:b/> atau <w:b w:val="..."/>) dari properti teks
+	rPr = rPr.replace(/<w:b\s*\/?>/g, '').replace(/<w:b\s+[^>]*\s*\/?>/g, '');
 
 	const newPXml = `<w:p>${pPr}<w:r>${rPr}<w:t>${escapeXml(text)}</w:t></w:r></w:p>`;
 	return cellXml.replace(pXml, newPXml);
