@@ -36,11 +36,43 @@
 	let imagePreviewUrl = $state<string | null>(null);
 	
 	let isSubmitting = $state(false);
+	let isGeneratingDescription = $state(false);
 	let fieldErrors = $state<Record<string, string>>({});
 	let serverResponse = $state<ApiResponse | null>(null);
 
 	const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 	const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/jpg'];
+
+	async function generateDescriptionWithAI() {
+		if (!deskripsi.trim()) {
+			toast.warning('Teks Kosong', 'Silakan ketik beberapa kata deskripsi terlebih dahulu.');
+			return;
+		}
+
+		isGeneratingDescription = true;
+		try {
+			const res = await fetch('/api/generate-description', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({ description: deskripsi })
+			});
+
+			const data = await res.json();
+			if (data.success && data.text) {
+				deskripsi = data.text;
+				toast.success('Penyempurnaan AI Berhasil', 'Deskripsi disempurnakan. Anda masih bisa mengeditnya sebelum dikirim.');
+			} else {
+				toast.error('AI Gagal Merapikan', data.message || 'Terjadi kesalahan.');
+			}
+		} catch (err: unknown) {
+			const errorMsg = err instanceof Error ? err.message : 'Gagal menghubungkan ke server.';
+			toast.error('Kesalahan Jaringan', errorMsg);
+		} finally {
+			isGeneratingDescription = false;
+		}
+	}
 
 	function handleFileSelect(event: Event) {
 		const input = event.target as HTMLInputElement;
@@ -238,19 +270,35 @@
 
 			<!-- 2. Deskripsi Kegiatan -->
 			<div class="space-y-2">
-				<label for="deskripsi" class="flex items-center justify-between text-sm font-semibold text-slate-200">
-					<span class="flex items-center gap-2">
+				<div class="flex items-center justify-between">
+					<label for="deskripsi" class="flex items-center gap-2 text-sm font-semibold text-slate-200">
 						<AlignLeft class="w-4 h-4 text-indigo-400" />
 						<span>Deskripsi Kegiatan <span class="text-rose-400">*</span></span>
-					</span>
-					<span class="text-[11px] font-normal text-slate-400">{deskripsi.length} karakter</span>
-				</label>
+					</label>
+					<div class="flex items-center gap-3">
+						<button
+							type="button"
+							onclick={generateDescriptionWithAI}
+							disabled={isSubmitting || isGeneratingDescription || !deskripsi.trim()}
+							class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+						>
+							{#if isGeneratingDescription}
+								<Loader2 class="w-3.5 h-3.5 animate-spin" />
+								<span>Merapikan...</span>
+							{:else}
+								<Sparkles class="w-3.5 h-3.5 text-indigo-400" />
+								<span>Sempurnakan dengan AI ✨</span>
+							{/if}
+						</button>
+						<span class="text-[11px] font-normal text-slate-400">{deskripsi.length} karakter</span>
+					</div>
+				</div>
 				<textarea
 					id="deskripsi"
 					rows="4"
 					placeholder="Jelaskan secara rinci kegiatan magang yang Anda lakukan hari ini..."
 					bind:value={deskripsi}
-					disabled={isSubmitting}
+					disabled={isSubmitting || isGeneratingDescription}
 					class="w-full px-4 py-3 rounded-xl bg-slate-950/80 border border-slate-800 text-slate-100 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all disabled:opacity-50 resize-y"
 				></textarea>
 				{#if fieldErrors.deskripsi}
